@@ -20,5 +20,8 @@ const fileItemSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+fileItemSchema.index({ assignedTo: 1, createdAt: -1 });
+fileItemSchema.index({ title: "text", description: "text" });
+
 
 export default mongoose.model("FileItem", fileItemSchema);

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
+import Pagination from "../../components/Pagination";
 
 export default function InchargeFiles() {
   const { id } = useParams();
@@ -12,26 +13,44 @@ export default function InchargeFiles() {
   const [incharges, setIncharges] = useState([]);
   const [form, setForm] = useState({ title: "", description: "", assignedTo: id });
 
-  async function refresh() {
-    const { data } = await api.get(`/admin/incharges/${id}/files`);
-    setFiles(data);
+  // search + pagination
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 10;
+
+  async function refresh({ pageArg = page, qArg = q } = {}) {
+    const { data } = await api.get(`/admin/incharges/${id}/files`, {
+      params: { page: pageArg, limit, q: qArg }
+    });
+    setFiles(data.data);
+    setPage(data.page);
+    setPages(data.pages);
+    setTotal(data.total);
   }
 
   useEffect(() => {
     (async () => {
-      const all = await api.get("/admin/incharges");
-      setIncharges(all.data);
-      await refresh();
+      const all = await api.get("/admin/incharges", { params: { limit: 999 } });
+      setIncharges(all.data.data || all.data); // supports old response shape if any
+      await refresh({ pageArg: 1 });
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const current = useMemo(() => incharges.find((x) => x._id === id)?.username || "", [incharges, id]);
+  const current = useMemo(() => {
+    const found =
+      (incharges.data || incharges).find?.((x) => x._id === id) ||
+      incharges.find?.((x) => x._id === id);
+    return found?.username || "";
+  }, [incharges, id]);
 
   async function createFile(e) {
     e.preventDefault();
     await api.post("/admin/files", form);
     setForm((f) => ({ ...f, title: "", description: "" }));
-    await refresh();
+    await refresh({ pageArg: 1 });
   }
 
   async function updateFile(fileId, patch) {
@@ -42,8 +61,13 @@ export default function InchargeFiles() {
   async function deleteFile(fileId) {
     if (confirm("Delete this file?")) {
       await api.delete(`/admin/files/${fileId}`);
-      await refresh();
+      await refresh({ pageArg: 1 });
     }
+  }
+
+  function onSearch(e) {
+    e.preventDefault();
+    refresh({ pageArg: 1, qArg: q });
   }
 
   return (
@@ -68,12 +92,12 @@ export default function InchargeFiles() {
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
-          <label>Reassign to</label>
+          <label>Assign/Reassign to</label>
           <select
             value={form.assignedTo}
             onChange={(e) => setForm((f) => ({ ...f, assignedTo: e.target.value }))}
           >
-            {incharges.map((u) => (
+            {(incharges.data || incharges).map?.((u) => (
               <option key={u._id} value={u._id}>{u.username}</option>
             ))}
           </select>
@@ -81,8 +105,20 @@ export default function InchargeFiles() {
         </form>
 
         <div className="card">
-          <h3>Assigned Files</h3>
-          <ul className="list">
+          <div className="row">
+            <h3>Assigned Files</h3>
+            <small className="muted">{total} total</small>
+          </div>
+          <form onSubmit={onSearch} className="row">
+            <input
+              placeholder="Search title/description…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <button type="submit">Search</button>
+          </form>
+
+          <ul className="list" style={{ marginTop: 8 }}>
             {files.map((f) => (
               <li key={f._id}>
                 <div className="row">
@@ -104,11 +140,13 @@ export default function InchargeFiles() {
 
                 <details className="mt8">
                   <summary>Edit</summary>
-                  <EditInline file={f} incharges={incharges} onSave={(p) => updateFile(f._id, p)} />
+                  <EditInline file={f} incharges={(incharges.data || incharges)} onSave={(p) => updateFile(f._id, p)} />
                 </details>
               </li>
             ))}
           </ul>
+
+          <Pagination page={page} pages={pages} onPage={(p) => refresh({ pageArg: p })} />
         </div>
       </div>
     </div>

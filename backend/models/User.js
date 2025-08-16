@@ -8,5 +8,8 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+userSchema.index({ role: 1, username: 1 });
+userSchema.index({ username: 1 }, { unique: true });
+
 
 export default mongoose.model("User", userSchema);
