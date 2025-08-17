@@ -9,7 +9,7 @@ import inchargeRoutes from "./routes/incharge.routes.js";
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
+app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
 
